@@ -26,7 +26,10 @@ struct matrix
 
   int cols() const
   {
-    return cells[0].size();
+    if (rows())
+      return cells[0].size();
+    else
+      return 0;
   }
 
   void init(int r, int s)
@@ -132,13 +135,7 @@ public:
     for (int i = 0; i < a.rows(); ++i)
       for (int j = 0; j < b.cols(); ++j)
         for (int k = 0; k < a.cols(); ++k)
-        {
-          if ((i == 0) && (j == 3))
-          {
-            //cout << "a";
-          }
           c[i][j] += a(i, k) * b(k, j);
-        }
 
     return c;
   }

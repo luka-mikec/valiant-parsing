@@ -16,31 +16,57 @@
 
 using namespace std;
 
-// union of symbols
-struct clause
-{
-  clause() {}
-  clause(const symbol & nont) { disjuncts = {nont};}
-  set<symbol> disjuncts;
-};
 
-ostream& operator<<(ostream& ostr, const symbol & n)
-{
-  ostr << string(n);
-  return ostr;
-}
-
-ostream& operator<<(ostream& ostr, const clause& c)
-{
-  ostr << "[";
-  for (auto& nont: c.disjuncts)
-    ostr << nont << " ";
-  ostr << "]";
-  return ostr;
-}
 
 map<symbol, set<pair<symbol, symbol>>> inside_productions; // A -> AA
 map<symbol, set<symbol>> outside_productions;  // A -> a
+set<symbol> terminals, nonterminals;
+map<symbol, int> nt_idxs;
+matrix<clause> backtrack; // if P -> AB, then P \in [A][B]
+
+template<>
+matrix<clause> matrix_view<clause>::operator* (const matrix_view<clause>& o)
+{
+  int h = nonterminals.size();
+  matrix<bool> *a = new matrix<bool>[h];
+  matrix<bool> *b = new matrix<bool>[h];
+
+  auto sym = nonterminals.begin();
+  for (int i = 0; i < h; ++i, ++sym)
+  {
+    a[i] = matrix<bool>(rows(), cols());
+    b[i] = matrix<bool>(o.rows(), o.cols());
+
+    for (int j = 0; j < rows(); ++j)
+      for (int k = 0; k < cols(); ++k)
+        a[i][j][k] = (*this)(j, k).disjuncts.find(*sym) != (*this)(j, k).disjuncts.end();
+
+    for (int j = 0; j < o.rows(); ++j)
+      for (int k = 0; k < o.cols(); ++k)
+        b[i][j][k] = o(j, k).disjuncts.find(*sym) != o(j, k).disjuncts.end();
+
+    //cout << i << endl << a[i] << endl << b[i] << endl;
+  }
+
+  matrix<bool> *c = new matrix<bool>[h * h];
+
+  for (int i = 0; i < h*h; ++i)
+  {
+    c[i] = matrix_view<bool>(a[i / h]) * b[i % h];
+    // cout << i << endl << c[i];
+  }
+
+  matrix<clause> res(rows(), o.cols());
+  for (int j = 0; j < rows(); ++j)
+    for (int k = 0; k < o.cols(); ++k)
+      for (int i = 0; i < h * h; ++i)
+        if (c[i][j][k])
+          res[j][k] += backtrack[i / h][i % h];
+
+  return res;
+  //return mul_op(*this, o);
+}
+
 
 clause producible_by(symbol a, symbol b)
 {
@@ -72,18 +98,6 @@ clause operator*(symbol a, symbol b)
   return producible_by(a, b);
 }
 
-clause operator+(const clause &a, const clause &b)
-{
-  clause c = a;
-  c.disjuncts.insert(b.disjuncts.begin(), b.disjuncts.end());
-  return c;
-}
-
-clause operator+=(clause &a, const clause &b)
-{
-  a.disjuncts.insert(b.disjuncts.begin(), b.disjuncts.end());
-  return a;
-}
 
 clause operator*(const clause &a, const clause &b)
 {
@@ -219,7 +233,34 @@ void closure(valiant_view &p)
 
 
 
+void use_grammar(const grammar &h)
+{
+  grammar g = h;
+  g.to_cfg();
 
+  terminals.insert(g.terminals.begin(), g.terminals.end());
+  nonterminals.insert(g.nonterminals.begin(), g.nonterminals.end());
+
+  int ns = nonterminals.size();
+  auto n_itr = nonterminals.begin();
+  for (int i = 0; i < ns; ++i, ++n_itr)
+    nt_idxs[*n_itr] = i;
+
+  backtrack.init(ns, ns);
+
+  for (auto& prod : g.prods)
+  {
+    if (prod.size() == 1)
+      outside_productions[prod.left].insert(prod.right[0]);
+    else
+    {
+      inside_productions[prod.left].insert(make_pair(prod.right[0], prod.right[1]));
+      backtrack[nt_idxs[prod.right[0]]][nt_idxs[prod.right[1]]].set_sym(prod.left);
+    }
+  }
+
+
+}
 
 int main()
 {
@@ -227,23 +268,50 @@ int main()
 
   grammar g;
   g.read_from_stream(ist);
-  //cout << g << endl;
-  g.to_cfg();
+  use_grammar(g);
 
-  for (auto& prod : g.prods)
+  /*valiant test = setup_parse_mat("ab");
+  valiant_view base(test);
+  valiant res = base * base;
+  cout << res << endl << res;
+
+  return 0;*/
+
+  std::function<set<string>(string)> words_gen;
+
+  for (int len = 1; len < 5; ++len)
   {
-    if (prod.size() == 1)
-      outside_productions[prod.left].insert(prod.right[0]);
-    else
-      inside_productions[prod.left].insert(make_pair(prod.right[0], prod.right[1]));
+    words_gen = [&g, &words_gen, len](string prefix)->set<string> {
+      set<string> res;
+      for (int i = 0; i < g.terminals.size(); ++i)
+      {
+        string w = prefix + (string)g.terminals[i];
+        if (w.size() < len)
+        {
+          set<string> more = words_gen(w);
+          res.insert(more.begin(), more.end());
+        }
+        else
+          res.insert(w);
+      }
+      return res;
+    };
+    set<string> exprs = words_gen("");
+    for (string expr : exprs)
+    {
+      valiant test = setup_parse_mat(expr); // setup_parse_mat("((p+q)*((q+p)+r))");
+      valiant_view base(test);
+
+      //cout << base << endl;
+
+      closure(base);
+
+      if (base(0, len).disjuncts.find(symbol("S")) != base(0, len).disjuncts.end())
+        cout << expr << "\t" << base(0, len) << endl;
+    }
   }
 
-  valiant test = setup_parse_mat("((0*0)+(1+0))");
 
-  valiant_view base(test);
-  closure(base);
-
-  cout << base;
 
   return 0;
 }

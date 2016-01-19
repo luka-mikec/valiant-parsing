@@ -29,6 +29,35 @@ bool symbol::operator <(const symbol & other) const
 }
 
 
+ostream& operator<<(ostream& ostr, const symbol & n)
+{
+  ostr << string(n);
+  return ostr;
+}
+
+ostream& operator<<(ostream& ostr, const clause& c)
+{
+  ostr << "[";
+  //cout << c.disjuncts.size() << endl;
+  for (auto& nont: c.disjuncts)
+    ostr << nont << " ";
+  ostr << "]";
+  return ostr;
+}
+
+clause operator+(const clause &a, const clause &b)
+{
+  clause c = a;
+  c.disjuncts.insert(b.disjuncts.begin(), b.disjuncts.end());
+  return c;
+}
+
+clause operator+=(clause &a, const clause &b)
+{
+  a.disjuncts.insert(b.disjuncts.begin(), b.disjuncts.end());
+  return a;
+}
+
 
 production::production(symbol l, valarray<symbol> r)
   : left(l), right(r)

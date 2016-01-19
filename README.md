@@ -6,13 +6,14 @@ Algorithm goes as follows:
  1. Convert grammar to Chomsky normal form.
  2. Build a Cocke–Younger–Kasami-like parsing matrix. Define semiring operations on sets of nonterminals (*clauses*).
  3. Unlike *CYK*, Compute closure using Valiant's divide-and-conquer algorithm.
- 4. Use binary (boolean) matrix  multiplication. *Not implemented yet.*
+ 4. Use binary (boolean) matrix  multiplication.
 
 
 ### Things inside
- - *matrix* and *matrix_view* generic structures. Both expect certain operations to be defined on used element type. Inside: matrix.h
+ - *matrix* and *matrix_view* generic structures. Both expect certain operations to be defined on used element type. Inside: matrix.h.
  - *grammar* structure, representing a context-free grammar. Can convert itself to CNF. Doesn't support epsilons/blanks. Can be loaded from a file (see **sample_input.txt**), Inside: grammar.h, grammar.cpp.
- - bunch of functions implementing Valiant's algorithm. See main() for usage.
+ - bunch of functions implementing Valiant's algorithm. See main() for usage. Inside: main.cpp.
+ 
 
 ### Compilation
 

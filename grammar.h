@@ -41,6 +41,24 @@ struct symbol
   bool operator <(const symbol & other) const;
 };
 
+ostream& operator<<(ostream& ostr, const symbol & n);
+
+
+// union of symbols
+struct clause
+{
+  clause() {}
+  clause(const symbol & nont) { disjuncts = {nont};}
+  set<symbol> disjuncts;
+
+  bool is_sym_set(symbol s) { return disjuncts.find(s) != disjuncts.end(); }
+  void set_sym(symbol s) {  disjuncts.insert(s); }
+};
+
+ostream& operator<<(ostream& ostr, const clause& c);
+clause operator+(const clause &a, const clause &b);
+clause operator+=(clause &a, const clause &b);
+
 
 struct production
 {
