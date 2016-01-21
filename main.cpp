@@ -1,32 +1,44 @@
-#include <iostream>
-#include <valarray>
-#include <functional>
-#include <list>
-#include <set>
 #include <fstream>
-#include <stdexcept>
-#include <sstream>
-#include <vector>
+#include <functional>
+#include <iostream>
+#include <list>
 #include <map>
-#include <utility>
+#include <set>
+#include <sstream>
+#include <stdexcept>
 #include <string>
+#include <utility>
+#include <valarray>
+#include <vector>
 
 #include "matrix.h"
 #include "grammar.h"
 
-using namespace std;
+using std::begin;            using std::binary_search;     using std::bit_or;
+using std::cin;              using std::cout;              using std::end;
+using std::equal;            using std::ifstream;          using std::istream;
+using std::list;             using std::make_pair;         using std::map;
+using std::ostream;          using std::pair;              using std::runtime_error;
+using std::set;              using std::string;            using std::stoi;
+using std::to_string;        using std::valarray;          using std::vector;
 
-
-
+// current grammar information (global because of operator overloads)
 map<symbol, set<pair<symbol, symbol>>> inside_productions; // A -> AA
 map<symbol, set<symbol>> outside_productions;  // A -> a
 set<symbol> terminals, nonterminals;
 map<symbol, int> nt_idxs;
 matrix<clause> backtrack; // if P -> AB, then P \in [A][B]
 
+// argv
+bool _g = false, _language = false, _bmm = false, _show_grammar = false, _show_table = false, _skip_interactive = false;
+
 template<>
 matrix<clause> matrix_view<clause>::operator* (const matrix_view<clause>& o)
 {
+  if (!_bmm)
+    return mul_op(*this, o);
+
+  // binary matrix multiplication
   int h = nonterminals.size();
   matrix<bool> *a = new matrix<bool>[h];
   matrix<bool> *b = new matrix<bool>[h];
@@ -44,8 +56,6 @@ matrix<clause> matrix_view<clause>::operator* (const matrix_view<clause>& o)
     for (int j = 0; j < o.rows(); ++j)
       for (int k = 0; k < o.cols(); ++k)
         b[i][j][k] = o(j, k).disjuncts.find(*sym) != o(j, k).disjuncts.end();
-
-    //cout << i << endl << a[i] << endl << b[i] << endl;
   }
 
   matrix<bool> *c = new matrix<bool>[h * h];
@@ -53,7 +63,6 @@ matrix<clause> matrix_view<clause>::operator* (const matrix_view<clause>& o)
   for (int i = 0; i < h*h; ++i)
   {
     c[i] = matrix_view<bool>(a[i / h]) * b[i % h];
-    // cout << i << endl << c[i];
   }
 
   matrix<clause> res(rows(), o.cols());
@@ -64,7 +73,6 @@ matrix<clause> matrix_view<clause>::operator* (const matrix_view<clause>& o)
           res[j][k] += backtrack[i / h][i % h];
 
   return res;
-  //return mul_op(*this, o);
 }
 
 
@@ -231,12 +239,13 @@ void closure(valiant_view &p)
 }
 
 
-
-
 void use_grammar(const grammar &h)
 {
   grammar g = h;
   g.to_cfg();
+
+  if (_show_grammar)
+    cout << g << endl;
 
   terminals.insert(g.terminals.begin(), g.terminals.end());
   nonterminals.insert(g.nonterminals.begin(), g.nonterminals.end());
@@ -262,24 +271,57 @@ void use_grammar(const grammar &h)
 
 }
 
-int main()
+int main(int argc, char** argv)
 {
-  ifstream ist("sample_input.txt");
+  string _grammar_adr = "boolean_algebra.txt";
+  int _lang_max_len;
+
+  for (int i = 1; i < argc; ++i)
+  {
+    string cmd = argv[i];
+    if (cmd == "-g")
+    {
+      _g = true;
+      _grammar_adr = argv[++i];
+    }
+    if (cmd == "-language")
+    {
+      _language = true;
+      _lang_max_len = stoi(argv[++i]);
+    }
+    if (cmd == "-skip_interactive") _skip_interactive = true;
+    if (cmd == "-bmm") _bmm = true;
+    if (cmd == "-show_table") _show_table = true;
+    if (cmd == "-show_grammar") _show_grammar = true;
+  }
+
+  ifstream ist(_grammar_adr);
+  if (!ist)
+    throw runtime_error("File " + _grammar_adr + " doesn't exist. Use -g <address> to specify grammar file.");
 
   grammar g;
   g.read_from_stream(ist);
+  if (_show_grammar)
+    cout << g << endl;
   use_grammar(g);
 
-  /*valiant test = setup_parse_mat("ab");
-  valiant_view base(test);
-  valiant res = base * base;
-  cout << res << endl << res;
+  string str;
+  if (!_skip_interactive)
+    while (cin >> str)
+    {
+      valiant test = setup_parse_mat(str);
+      valiant_view base(test);
+      closure(base);
+      if (_show_table)
+        cout << base << endl;
+      cout << (base(0, str.length()).disjuncts.find(symbol("S")) != base(0, str.length()).disjuncts.end()) << endl;
+    }
 
-  return 0;*/
+  if (!_language)
+    return 0;
 
   std::function<set<string>(string)> words_gen;
-
-  for (int len = 1; len < 5; ++len)
+  for (int len = 1; len < _lang_max_len + 1; ++len)
   {
     words_gen = [&g, &words_gen, len](string prefix)->set<string> {
       set<string> res;
@@ -299,19 +341,16 @@ int main()
     set<string> exprs = words_gen("");
     for (string expr : exprs)
     {
-      valiant test = setup_parse_mat(expr); // setup_parse_mat("((p+q)*((q+p)+r))");
+      valiant test = setup_parse_mat(expr);
       valiant_view base(test);
-
-      //cout << base << endl;
 
       closure(base);
 
       if (base(0, len).disjuncts.find(symbol("S")) != base(0, len).disjuncts.end())
-        cout << expr << "\t" << base(0, len) << endl;
+        cout << expr << endl;
+
     }
   }
-
-
 
   return 0;
 }
