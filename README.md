@@ -14,6 +14,9 @@ Algorithm goes as follows:
  - *grammar* structure, representing a context-free grammar. Can convert itself to CNF. Doesn't support epsilons/blanks. Can be loaded from a file (see **sample_input.txt**), Inside: grammar.h, grammar.cpp.
  - bunch of functions implementing Valiant's algorithm. See main() for usage. Inside: main.cpp.
 
+Current implementation isn't using the fastest known matrix multiplication, so the graph looks like this (loglog).
+![Graph valiant](/essay/graf.png "Graph")
+
 
 ## Compilation
 On Unix-based systems:
